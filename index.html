@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Security Awareness Video - Phishing and Social Engineering (English)</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 850px;
+      margin: 40px auto;
+      padding: 20px;
+      text-align: center;
+      background: #f5f7fa;
+      color: #222;
+    }
+
+    .container {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px #00000010;
+    }
+
+    .video {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      margin: 20px 0;
+      background: black;
+    }
+
+    #player {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #status {
+      color: #555;
+      font-size: 14px;
+    }
+
+    .button {
+      display: inline-block;
+      background: #1769e0;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      text-decoration: none;
+      cursor: pointer;
+      margin: 8px;
+      font-size: 15px;
+    }
+
+    .button:hover {
+      background: #0d50b5;
+    }
+
+    .button[hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Watch the Video</h1>
+
+    <p>
+      Please watch the entire video.
+      You will be redirected to the survey when it finishes.
+    </p>
+
+    <div class="video">
+      <!-- Local video: place the files in the same folder as this page. -->
+      <video id="player" controls playsinline preload="auto">
+        <source src="secvid2.mp4" type="video/mp4">
+        <track kind="captions" src="captions-tl.vtt" srclang="tl" label="Tagalog" default>
+        Your browser does not support HTML5 video.
+      </video>
+    </div>
+
+    <p id="status" role="status" aria-live="polite">
+      Loading video...
+    </p>
+
+    <button id="startButton" class="button" hidden>
+      Start Video
+    </button>
+
+    <a id="surveyLink" class="button" href="#" hidden>
+      Open Survey
+    </a>
+  </div>
+
+  <script>
+    // =====================================
+    // CONFIGURATION
+    // =====================================
+
+    const FORM_URL =
+      "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=HFv4cHjEkEOjr9j_PUzWOWAVVMe-UMtClxYBjAQB2N1UMUhYQTdEVjU3WTlXWTVaM0o1QVhLTk1JTi4u";
+    // Set to true to stop viewers from skipping ahead past what they've watched.
+    const DISABLE_SEEKING = false;
+
+    // =====================================
+    // INITIAL STATE
+    // =====================================
+
+    let finished = false;
+    let maxTimeWatched = 0;
+
+    const video = document.getElementById("player");
+    const status = document.getElementById("status");
+    const startButton = document.getElementById("startButton");
+    const surveyLink = document.getElementById("surveyLink");
+
+    // Hide both buttons on page load.
+    surveyLink.hidden = true;
+    startButton.hidden = true;
+
+    surveyLink.href = FORM_URL;
+
+    // =====================================
+    // AUTOPLAY
+    // =====================================
+
+    function tryAutoplay() {
+      status.textContent = "Attempting to start video...";
+
+      // play() returns a promise; it rejects if the browser blocks autoplay.
+      const attempt = video.play();
+
+      if (attempt !== undefined) {
+        attempt.catch(() => {
+          startButton.hidden = false;
+          status.textContent =
+            "If the video does not start, press Start Video.";
+        });
+      }
+    }
+
+    video.addEventListener("loadeddata", tryAutoplay, { once: true });
+
+    // Manual fallback if the browser blocks autoplay.
+    // The click counts as user interaction, so sound is allowed.
+    startButton.addEventListener("click", () => {
+      if (finished) return;
+
+      startButton.hidden = true;
+      video.muted = false;
+      video.volume = 1;
+      video.play();
+
+      status.textContent = "Starting video...";
+    });
+
+    // =====================================
+    // MONITOR VIDEO PLAYBACK
+    // =====================================
+
+    video.addEventListener("playing", () => {
+      if (finished) return;
+
+      startButton.hidden = true;
+
+      // Keep the survey hidden during playback.
+      surveyLink.hidden = true;
+
+      status.textContent = "Video playing. Please watch until the end.";
+    });
+
+    video.addEventListener("waiting", () => {
+      if (finished) return;
+      status.textContent = "Buffering video...";
+    });
+
+    video.addEventListener("pause", () => {
+      if (finished || video.ended) return;
+      status.textContent = "Video paused. Resume playback to continue.";
+    });
+
+    // Optional: block skipping ahead.
+    video.addEventListener("timeupdate", () => {
+      if (!video.seeking && video.currentTime > maxTimeWatched) {
+        maxTimeWatched = video.currentTime;
+      }
+    });
+
+    video.addEventListener("seeking", () => {
+      if (DISABLE_SEEKING && video.currentTime > maxTimeWatched + 0.5) {
+        video.currentTime = maxTimeWatched;
+      }
+    });
+
+    video.addEventListener("ended", finishVideo);
+
+    // =====================================
+    // VIDEO COMPLETION
+    // =====================================
+
+    function finishVideo() {
+      if (finished) return;
+
+      finished = true;
+      startButton.hidden = true;
+
+      status.textContent = "Video completed! Opening the survey...";
+
+      // Only reveal the survey after playback ends.
+      surveyLink.hidden = false;
+
+      // Attempt automatic redirection.
+      window.location.href = FORM_URL;
+
+      // Fallback if the page remains open.
+      setTimeout(() => {
+        status.textContent =
+          "If you were not redirected, click below to open the survey.";
+      }, 2000);
+    }
+
+    // =====================================
+    // VIDEO ERROR HANDLING
+    // =====================================
+
+    video.addEventListener("error", () => {
+      startButton.hidden = true;
+      surveyLink.hidden = true;
+
+      status.textContent =
+        "Unable to play the video. Check that security-awareness.mp4 " +
+        "is in the same folder as this page.";
+
+      console.error("Video error:", video.error);
+    });
+
+    // The <source> element fires its own error if the file 404s.
+    video.querySelector("source").addEventListener("error", () => {
+      status.textContent =
+        "Video file not found. Check that security-awareness.mp4 " +
+        "is in the same folder as this page.";
+    });
+  </script>
+</body>
+</html>
